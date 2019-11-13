@@ -1,29 +1,41 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"log"
 	"os"
-	"os/user"
-	"path/filepath"
-	"regexp"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
-// list	list of tracking resources
+// list						list of tracking resources
 // check [<name>|--all]
 // update [<name>|--all]
 
 type replacement struct {
-	Search      regexp.Regexp `json:"source"`
-	Replacement string        `json:"replacement"`
+	Search      string
+	Replacement string
 }
 type listEntry struct {
-	Name       string        `json:"name"`
-	URL        string        `json:"url"`
-	Checked    time.Time     `json:"checked"`
-	Updated    time.Time     `json:"updated"`
-	Processing []replacement `json:"replacement"`
+	Name       string
+	URL        string
+	Checked    time.Time     `yaml:",omitempty"`
+	Updated    time.Time     `yaml:",omitempty"`
+	Processing []replacement `yaml:",omitempty"`
+}
+
+func save(entriesFileName string, entries []listEntry) {
+	ret, err := yaml.Marshal(entries)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	entriesFile, err := os.Create(entriesFileName)
+	_, err = entriesFile.Write(ret)
+	if err != nil {
+		log.Fatalf("Failed to write config: %v\n", err)
+	}
+	entriesFile.Close()
 }
 
 func (e listEntry) String() string {
@@ -31,19 +43,15 @@ func (e listEntry) String() string {
 }
 
 func main() {
-	entries := []listEntry{}
-	user, err := user.Current()
-	if err != nil {
-		fmt.Println("Failed to obtain current user: ", err)
-		os.Exit(1)
-	}
-	entriesFileName := filepath.Join(user.HomeDir, "entries.json")
+	var entries []listEntry // = {
+	//		{"google", "http://www.google.com/", time.Now(), time.Now(), []replacement{{"src", "dst"}}},
+	//	}
+	entriesFileName := "entries.yml"
 	entriesFile, err := os.Open(entriesFileName)
 	if err == nil {
-		fmt.Println("Reading entries from file")
-		decoder := json.NewDecoder(entriesFile)
+		decoder := yaml.NewDecoder(entriesFile)
 		if err := decoder.Decode(&entries); err != nil {
-			fmt.Println("Error: ", err)
+			log.Fatalln("Error: ", err)
 		}
 		entriesFile.Close()
 	} else if os.IsExist(err) {
@@ -57,9 +65,9 @@ func main() {
 			os.Exit(0)
 		case "check":
 		case "update":
-			fmt.Println("Not implemented")
-			os.Exit(0)
+			save(entriesFileName, entries)
+			log.Fatalln("Not implemented")
 		}
 	}
-	fmt.Println("Usage: srcmon [list|check <name>|update <name>]")
+	fmt.Println("Usage: srcrt [list|check <name>|update <name>]")
 }
