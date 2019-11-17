@@ -18,21 +18,22 @@ type replacement struct {
 	Replacement string
 }
 
-type listEntry struct {
-	Name       string
+type source struct {
 	URL        string
 	Checked    *time.Time    `yaml:",omitempty"`
 	Updated    *time.Time    `yaml:",omitempty"`
 	Processing []replacement `yaml:",omitempty"`
 }
 
+type sources map[string]source
+
 const configFileName string = "srctr.yml"
 
-func loadConfig(entries *[]listEntry) bool {
+func loadConfig(cfg *sources) bool {
 	entriesFile, err := os.Open(configFileName)
 	if err == nil {
 		decoder := yaml.NewDecoder(entriesFile)
-		if err := decoder.Decode(&entries); err != nil {
+		if err := decoder.Decode(&cfg); err != nil {
 			log.Fatalln("Error: ", err)
 		}
 		entriesFile.Close()
@@ -43,8 +44,8 @@ func loadConfig(entries *[]listEntry) bool {
 	return true
 }
 
-func saveConfig(entries *[]listEntry) {
-	ret, err := yaml.Marshal(entries)
+func saveConfig(cfg sources) {
+	ret, err := yaml.Marshal(cfg)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -61,29 +62,29 @@ func saveConfig(entries *[]listEntry) {
 	}
 }
 
-func printList(entries *[]listEntry) {
-	for _, e := range *entries {
-		fmt.Printf("%v: checked %s, updated %s\n", e.Name, e.Checked, e.Updated)
+func printList(src sources) {
+	for name, e := range src {
+		fmt.Printf("%v: checked %s, updated %s\n", name, e.Checked, e.Updated)
 	}
 }
 
 func main() {
-	var entries []listEntry // = {
-	//		{"google", "http://www.google.com/", time.Now(), time.Now(), []replacement{{"src", "dst"}}},
-	//	}
-	if !loadConfig(&entries) {
+	var cfg sources
+
+	if !loadConfig(&cfg) {
 		os.Exit(1)
 	}
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "list":
-			printList(&entries)
+			printList(cfg)
 			os.Exit(0)
 		case "check":
 		case "update":
-			saveConfig(&entries)
+			saveConfig(cfg)
 			log.Fatalln("Not implemented")
 		}
 	}
+
 	fmt.Println("Usage: srcrt [list|check <name>|update <name>]")
 }
